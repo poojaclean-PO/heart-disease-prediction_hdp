@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import streamlit as st
 import pandas as pd
 import joblib
@@ -15,174 +17,59 @@ st.set_page_config(
 
 
 # ============================================================
-# Load Saved Models
+# Model File Paths
+# ============================================================
+
+# Get the folder where app.py is located
+BASE_DIR = Path(__file__).resolve().parent
+
+# Final Logistic Regression model and threshold
+LR_MODEL_PATH = BASE_DIR / "heart_logistic_final_pipeline.pkl"
+LR_THRESHOLD_PATH = BASE_DIR / "heart_logistic_final_threshold.pkl"
+
+# Final Random Forest model and threshold
+RF_MODEL_PATH = BASE_DIR / "heart_rf_final_pipeline.pkl"
+RF_THRESHOLD_PATH = BASE_DIR / "heart_rf_final_threshold.pkl"
+
+
+# ============================================================
+# Load Final Saved Models
 # ============================================================
 
 @st.cache_resource
 def load_models():
 
-    # Logistic Regression pipeline
-    logistic_model = joblib.load(
-        "heart_logistic_pipeline.pkl"
+    # Load final Logistic Regression pipeline
+    logistic_model = joblib.load(LR_MODEL_PATH)
+
+    # Load final Logistic Regression threshold
+    logistic_threshold = float(
+        joblib.load(LR_THRESHOLD_PATH)
     )
 
-    # Tuned Random Forest pipeline
-    # This pipeline already contains preprocessing
-    # + Random Forest model
-    random_forest_model = joblib.load(
-        "heart_tuned_rf_pipeline.pkl"
-    )
+    # Load final Random Forest pipeline
+    random_forest_model = joblib.load(RF_MODEL_PATH)
 
-    # Saved threshold information
-    thresholds = joblib.load(
-        "heart_model_thresholds.pkl"
+    # Load final Random Forest threshold
+    random_forest_threshold = float(
+        joblib.load(RF_THRESHOLD_PATH)
     )
 
     return (
         logistic_model,
+        logistic_threshold,
         random_forest_model,
-        thresholds
+        random_forest_threshold
     )
 
 
 # Load models
-logistic_model, random_forest_model, thresholds = load_models()
-
-
-# ============================================================
-# Model Thresholds
-# ============================================================
-
-# Logistic Regression threshold selected during
-# previous model evaluation
-LOGISTIC_THRESHOLD = 0.68
-
-
-def get_rf_threshold(thresholds):
-
-    """
-    Get the tuned Random Forest threshold from
-    heart_model_thresholds.pkl.
-
-    If the saved file contains a Random Forest
-    threshold, use it.
-
-    Otherwise use the validated tuned threshold
-    of 0.50.
-    """
-
-    # --------------------------------------------------------
-    # Dictionary
-    # --------------------------------------------------------
-
-    if isinstance(thresholds, dict):
-
-        possible_keys = [
-            "random_forest_tuned",
-            "rf_threshold",
-            "random_forest_threshold",
-            "RF_THRESHOLD",
-            "tuned_rf_threshold",
-            "threshold"
-        ]
-
-        for key in possible_keys:
-
-            if key in thresholds:
-
-                value = thresholds[key]
-
-                # Handle scalar values
-                if isinstance(
-                    value,
-                    (int, float)
-                ):
-
-                    return float(value)
-
-        # Check dictionary values for a numeric value
-        for value in thresholds.values():
-
-            if isinstance(
-                value,
-                (int, float)
-            ):
-
-                # We only use this fallback if
-                # there is exactly one numeric value
-                numeric_values = [
-                    v for v in thresholds.values()
-                    if isinstance(v, (int, float))
-                ]
-
-                if len(numeric_values) == 1:
-
-                    return float(value)
-
-
-    # --------------------------------------------------------
-    # Single numeric threshold
-    # --------------------------------------------------------
-
-    if isinstance(
-        thresholds,
-        (int, float)
-    ):
-
-        return float(thresholds)
-
-
-    # --------------------------------------------------------
-    # DataFrame
-    # --------------------------------------------------------
-
-    if isinstance(
-        thresholds,
-        pd.DataFrame
-    ):
-
-        # If a Model column exists, try to find RF row
-        if "Model" in thresholds.columns:
-
-            model_values = (
-                thresholds["Model"]
-                .astype(str)
-                .str.lower()
-            )
-
-            rf_rows = thresholds[
-                model_values.str.contains(
-                    "random|rf",
-                    regex=True,
-                    na=False
-                )
-            ]
-
-            if not rf_rows.empty:
-
-                if "Threshold" in rf_rows.columns:
-
-                    return float(
-                        rf_rows["Threshold"].iloc[0]
-                    )
-
-        # Otherwise look for Threshold column
-        if "Threshold" in thresholds.columns:
-
-            return float(
-                thresholds["Threshold"].iloc[0]
-            )
-
-
-    # --------------------------------------------------------
-    # Validated tuned RF threshold
-    # --------------------------------------------------------
-
-    return 0.50
-
-
-# Get Random Forest threshold
-RF_THRESHOLD = get_rf_threshold(thresholds)
+(
+    logistic_model,
+    LOGISTIC_THRESHOLD,
+    random_forest_model,
+    RF_THRESHOLD
+) = load_models()
 
 
 # ============================================================
@@ -395,7 +282,6 @@ if st.button(
         "KidneyDisease": [KidneyDisease],
 
         "SkinCancer": [SkinCancer]
-
     })
 
 
@@ -415,7 +301,7 @@ if st.button(
 
 
     # ========================================================
-    # Tuned Random Forest Prediction
+    # Random Forest Prediction
     # ========================================================
 
     rf_probability = (
@@ -436,7 +322,6 @@ if st.button(
     st.divider()
 
     st.subheader("Prediction Results")
-
 
     result_col1, result_col2 = st.columns(2)
 
